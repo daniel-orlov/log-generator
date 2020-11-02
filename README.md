@@ -1,2 +1,2 @@
 # log-generator
-Access log generator for nginx on Go
+Access log generator for nginx using Go
