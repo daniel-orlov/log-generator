@@ -2,35 +2,21 @@ package main
 
 import (
 	"fmt"
-	"github.com/brianvoe/gofakeit"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/brianvoe/gofakeit"
 )
 
 func main() {
 	rateString := os.Getenv("RATE")
 	rate, err := strconv.ParseFloat(rateString, 32)
 	if err != nil {
-		err = fmt.Errorf(
-			"failed parsing environmental variable 'RATE' into a float: %w", err,
-		)
+		err = fmt.Errorf("failed to parse string to float: %w", err)
+		fmt.Println(err)
 	}
-
-	logFile, err := os.OpenFile("fake.log",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		err = fmt.Errorf(
-			"failed opening a file 'fake.log': %w", err,
-		)
-	}
-	defer logFile.Close()
-
-	logger := log.New(logFile, "", log.LstdFlags)
-	//logger.Printf("Checking connection. Rate is %v. Over.\n", rate)
-	//log.SetOutput(ioutil.Discard) // /dev/null
 
 	ticker := time.NewTicker(time.Second / time.Duration(rate))
 
@@ -53,7 +39,7 @@ func main() {
 		bodyBytesSent = realisticBytesSent(statusCode)
 		userAgent = gofakeit.UserAgent()
 
-		logger.Printf("%s - - [%s] \"%s %s %s\" %v %v \"%s\" \"%s\"\n", ip,
+		fmt.Printf("%s - - [%s] \"%s %s %s\" %v %v \"%s\" \"%s\"\n", ip,
 			timeLocal.Format("02/Jan/2006:15:04:05 -0700"), httpMethod,
 			path, httpVersion, statusCode, bodyBytesSent, referrer, userAgent)
 	}
