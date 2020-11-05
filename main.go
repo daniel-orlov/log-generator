@@ -3,36 +3,85 @@ package main
 import (
 	"fmt"
 	"github.com/brianvoe/gofakeit"
-	"log"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
 func main() {
-	rateString := os.Getenv("RATE")
-	rate, err := strconv.ParseFloat(rateString, 32)
+	//getting writer type
+	lwType, err := getWriter()
 	if err != nil {
-		err = fmt.Errorf(
-			"failed parsing environmental variable 'RATE' into a float: %w", err,
-		)
+		err = fmt.Errorf("failed to get Writer: %w", err)
+		fmt.Println(err)
+		return
+	}
+	//choosing correspondent writer
+	var lw logWriter
+	switch lwType {
+	case 0:
+		lw = logToNullWriter{}
+	case 1:
+		lw = logToFileWriter{file: os.Getenv("FILENAME")}
 	}
 
-	logFile, err := os.OpenFile("fake.log",
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fmt.Printf("lw: %#v\n", lw)
+	//generating logs and writing them to the writer of choice
+	logGenerator(lw)
+}
+
+func logGenerator(lw logWriter) {
+	fakeLog, err := logFaker()
+	if err != nil {
+		err = fmt.Errorf("failed to generate logs: %w", err)
+		fmt.Println(err)
+		return
+	}
+	lw.Write(fakeLog)
+}
+
+func logFaker() (fakeLog string, err error) {
+	ut, err := getUptime()
+	if err != nil {
+		err = fmt.Errorf("failed to launch logs timer: %w", err)
+		fmt.Println(err)
+		return
+	}
+
+	rate, err := getRate()
 	if err != nil {
 		err = fmt.Errorf(
-			"failed opening a file 'fake.log': %w", err,
+			"cannot start logFaker: %w", err,
 		)
+		return "", err
 	}
-	defer logFile.Close()
 
-	logger := log.New(logFile, "", log.LstdFlags)
-	//logger.Printf("Checking connection. Rate is %v. Over.\n", rate)
-	//log.SetOutput(ioutil.Discard) // /dev/null
+	lineSize, err := getLineSize()
+	if err != nil {
+		err = fmt.Errorf(
+			"cannot start lineFaker: %w", err,
+		)
+		fmt.Println(err) //TODO: replace w/ return statement
+		return "", err
+	}
 
 	ticker := time.NewTicker(time.Second / time.Duration(rate))
+
+	alive := true
+	go func() {
+		time.Sleep(time.Second * time.Duration(ut))
+		alive = false
+	}()
+
+	for range ticker.C {
+		if !alive {
+			break
+		}
+		fakeLog += lineFaker(lineSize) + "\n" //TODO: replace with writing to a []byte buffer
+	}
+	return fakeLog, nil
+}
+
+func lineFaker(lineSize int64) (line string) {
 
 	gofakeit.Seed(time.Now().UnixNano())
 
@@ -43,70 +92,20 @@ func main() {
 	httpVersion = "HTTP/1.1"
 	referrer = "-"
 
-	for range ticker.C {
-		timeLocal = time.Now()
+	timeLocal = time.Now()
 
-		ip = gofakeit.IPv4Address()
-		httpMethod = weightedHTTPMethod(50, 20)
-		path = randomPath(1, 5)
-		statusCode = weightedStatusCode(80)
-		bodyBytesSent = realisticBytesSent(statusCode)
-		userAgent = gofakeit.UserAgent()
+	ip = gofakeit.IPv4Address()
+	httpMethod = weightedHTTPMethod(50, 20)
+	path = randomPath(1, 5)
+	statusCode = weightedStatusCode(80)
+	bodyBytesSent = realisticBytesSent(statusCode)
+	userAgent = gofakeit.UserAgent()
 
-		logger.Printf("%s - - [%s] \"%s %s %s\" %v %v \"%s\" \"%s\"\n", ip,
+	for i := 0; int64(i) < lineSize; i++ {
+		lineBit := fmt.Sprintf("%s - - [%s] \"%s %s %s\" %v %v \"%s\" \"%s\"", ip,
 			timeLocal.Format("02/Jan/2006:15:04:05 -0700"), httpMethod,
 			path, httpVersion, statusCode, bodyBytesSent, referrer, userAgent)
+		line += lineBit //TODO: get rid of concatenation to optimize performance
 	}
-}
-
-func realisticBytesSent(statusCode int) int {
-	if statusCode != 200 {
-		return gofakeit.Number(30, 120)
-	}
-
-	return gofakeit.Number(800, 3100)
-}
-
-func weightedStatusCode(percentageOk int) int {
-	roll := gofakeit.Number(0, 100)
-	if roll <= percentageOk {
-		return 200
-	}
-
-	return gofakeit.SimpleStatusCode()
-}
-
-func weightedHTTPMethod(percentageGet, percentagePost int) string {
-	if percentageGet+percentagePost > 100 {
-		panic("percentageGet and percentagePost add up to more than 100%")
-	}
-
-	roll := gofakeit.Number(0, 100)
-	if roll <= percentageGet {
-		return "GET"
-	} else if roll <= percentagePost {
-		return "POST"
-	}
-
-	return gofakeit.HTTPMethod()
-}
-
-func randomPath(min, max int) string {
-	var path strings.Builder
-	length := gofakeit.Number(min, max)
-
-	path.WriteString("/")
-
-	for i := 0; i < length; i++ {
-		if i > 0 {
-			path.WriteString(gofakeit.RandString([]string{"-", "-", "_", "%20", "/", "/", "/"}))
-		}
-		path.WriteString(gofakeit.BuzzWord())
-	}
-
-	path.WriteString(gofakeit.RandString([]string{".hmtl", ".php", ".htm", ".jpg", ".png", ".gif", ".svg", ".css",
-		".js"}))
-
-	result := path.String()
-	return strings.Replace(result, " ", "%20", -1)
+	return
 }

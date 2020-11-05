@@ -14,5 +14,9 @@
 # Goland files
 *.idea
 
+# Actual fake logs
+*.txt
+*.log
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
