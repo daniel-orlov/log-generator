@@ -14,9 +14,11 @@
 # Goland files
 *.idea
 
-# Actual fake logs
+# Actual fake logs + offsets
 *.txt
 *.log
+*.yaml
+*.yml
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
