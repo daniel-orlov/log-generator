@@ -15,6 +15,7 @@
 *.idea
 
 # Actual fake logs + offsets
+.fakelogs
 *.txt
 *.log
 *.yaml
